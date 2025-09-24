@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Candidate Video Submission</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      max-width: 900px;
+      width: 100%;
+    }
+    h2 {
+      color: #d63384;
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+    .note {
+      font-size: 15px;
+      font-weight: bold;
+      color: #444;
+      background: #fff3cd;
+      border: 1px solid #ffeeba;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 25px;
+    }
+    .question-list {
+      list-style-type: none;
+      padding: 0;
+    }
+    .question-list li {
+      margin-bottom: 20px;
+      background: #fafafa;
+      padding: 15px;
+      border-left: 4px solid #d63384;
+      border-radius: 6px;
+    }
+    video {
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 8px;
+      background: black;
+      display: none;
+    }
+    button {
+      margin-top: 15px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: background-color 0.3s ease;
+    }
+    .start { background: #007bff; color: white; }
+    .start:hover { background: #0056b3; }
+    .stop { background: #dc3545; color: white; }
+    .stop:hover { background: #c82333; }
+    .upload { background: #28a745; color: white; }
+    .upload:hover { background: #218838; }
+    .re-record { background: #6c757d; color: white; }
+    .re-record:hover { background: #5a6268; }
+    #status {
+      margin-top: 15px;
+      font-size: 16px;
+      color: #555;
+      text-align: center;
+    }
+
+    /* Loading modal */
+    #loadingModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #loadingBox {
+      background: white;
+      padding: 30px 40px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Candidate Video Submission</h2>
+    <div class="note">
+      ⚠️ Recording must be <b>5–7 minutes</b> only. Please answer all the questions below.
+    </div>
+    
+    <ul class="question-list">
+      <li>**Question 1:** This role requires onsite presence on an as-needed basis, which could be three days a week or more. If you're a local candidate, please let us know if you're comfortable with this arrangement and tell us why? If you are from out-of-state, are you willing to relocate and tell us why?</li>
+      <li>**Question 2:** Please describe your experience in category management, focusing on two key areas: (1) full-cycle or multi-step sourcing, and (2) stakeholder management.</li>
+      <li>**Question 3:** What is the size of the spend you have managed, and how many years of experience do you have in specific categories? Have you specialized in a single category, or have you worked across multiple categories. We're particularly interested in candidates with deep expertise in focused categories. Please explain your answer in detail.</li>
+      <li>**Question 4:** Please describe your experience in leadership and people management. What teams or functions have you led, and what was the scope of your responsibility?</li>
+    </ul>
+
+    <input type="text" id="fullName" placeholder="Full Name">
+    <input type="email" id="email" placeholder="Email Address">
+
+    <div id="controls">
+      <button id="startBtn" class="start">Start Recording</button>
+      <button id="stopBtn" class="stop" style="display:none;">Stop Recording</button>
+    </div>
+
+    <video id="preview" autoplay muted></video>
+
+    <div id="afterRecording" style="display:none;">
+      <button id="reRecordBtn" class="re-record">Re-record</button>
+      <button id="uploadBtn" class="upload">Upload</button>
+    </div>
+
+    <p id="status"></p>
+  </div>
+
+  <div id="loadingModal">
+    <div id="loadingBox">Uploading video, please wait...</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script>
+    const { createClient } = supabase;
+    const supabaseClient = createClient(
+      "https://rxwdqmfeeknxshbydsne.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4d2RxbWZlZWtueHNoYnlkc25lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNDMyNTksImV4cCI6MjA3MzcxOTI1OX0.sP8DJzwLrC4tJ8JJjVhBUKitVsXsiNFYnsj0jLdlD2U"
+    );
+
+    let mediaRecorder, recordedChunks = [], stream;
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const reRecordBtn = document.getElementById("reRecordBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const preview = document.getElementById("preview");
+    const afterRecording = document.getElementById("afterRecording");
+    const status = document.getElementById("status");
+    const loadingModal = document.getElementById("loadingModal");
+
+    startBtn.onclick = async () => {
+      recordedChunks = [];
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      preview.srcObject = stream;
+      preview.style.display = "block";
+
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.start();
+
+      startBtn.style.display = "none";
+      stopBtn.style.display = "inline-block";
+      status.textContent = "Recording in progress...";
+    };
+
+    stopBtn.onclick = () => {
+      mediaRecorder.stop();
+      stream.getTracks().forEach(track => track.stop());
+      
+      // Event listener for when recording stops
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: "video/webm" });
+        preview.srcObject = null;
+        preview.src = URL.createObjectURL(blob);
+        preview.controls = true; // Add playback controls for the user
+      };
+
+      stopBtn.style.display = "none";
+      afterRecording.style.display = "block";
+      status.textContent = "Recording stopped. You can preview, re-record, or upload your video.";
+    };
+
+    reRecordBtn.onclick = () => {
+      afterRecording.style.display = "none";
+      preview.style.display = "none";
+      preview.src = ""; // Clear the video source
+      preview.controls = false;
+      startBtn.style.display = "inline-block";
+      status.textContent = "You can re-record now.";
+    };
+
+    uploadBtn.onclick = async () => {
+      const fullName = document.getElementById("fullName").value.trim();
+      const email = document.getElementById("email").value.trim();
+      if (!fullName || !email) {
+        alert("Please enter your full name and email address.");
+        return;
+      }
+
+      const blob = new Blob(recordedChunks, { type: "video/webm" });
+      const fileName = `${fullName.replace(/\s+/g, '_')}_${email}_${Date.now()}.webm`;
+
+      loadingModal.style.display = "flex";
+      status.textContent = "Uploading...";
+
+      // Step 1: Upload the video to Supabase Storage
+      const { data: storageData, error: storageError } = await supabaseClient.storage
+        .from("video_cover_sheet")
+        .upload(fileName, blob, { contentType: "video/webm" });
+
+      if (storageError) {
+        loadingModal.style.display = "none";
+        status.textContent = "❌ Upload failed. Please try again.";
+        console.error(storageError);
+        return;
+      }
+
+      // Step 2: Get the public URL of the uploaded video
+      const { data: { publicUrl } } = supabaseClient.storage
+        .from("video_cover_sheet")
+        .getPublicUrl(fileName);
+
+      // Step 3: Insert the user data and video URL into the database
+      const { error: dbError } = await supabaseClient
+        .from("video_submissions") // Make sure this table exists in your Supabase project
+        .insert([
+          { full_name: fullName, email: email, video_url: publicUrl },
+        ]);
+
+      loadingModal.style.display = "none";
+
+      if (dbError) {
+        status.textContent = "❌ Database record failed to save. Video uploaded successfully, but contact support.";
+        console.error(dbError);
+      } else {
+        status.textContent = "✅ Video and data uploaded successfully!";
+        afterRecording.style.display = "none";
+        startBtn.style.display = "inline-block";
+        document.getElementById("fullName").value = "";
+        document.getElementById("email").value = "";
+        preview.src = "";
+        preview.controls = false;
+      }
+    };
+  </script>
+</body>
+</html>
